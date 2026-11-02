@@ -1,0 +1,6 @@
+.env
+*.pdf
+preflop.json
+__pycache__/
+venv/
+.venv/

@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Покер-калькулятор</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{
+  --bg:var(--tg-theme-bg-color,#ffffff);
+  --text:var(--tg-theme-text-color,#15171a);
+  --hint:var(--tg-theme-hint-color,#8a8f98);
+  --sec:var(--tg-theme-secondary-bg-color,#f0f1f4);
+  --accent:var(--tg-theme-button-color,#2a8bf2);
+  --accent-text:var(--tg-theme-button-text-color,#ffffff);
+  --felt:#17603d;--felt2:#0f4a2e;
+  --s:#1b1d21;--h:#c62828;--d:#c62828;--c:#1b1d21;
+  --good:#1f9d55;--bad:#d23b3b;--hand:#16a34a;--board:#2563eb;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.35 -apple-system,system-ui,"Segoe UI",Roboto,sans-serif;padding:12px 12px 24px;max-width:480px;margin:0 auto}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+
+.table{background:radial-gradient(ellipse at 50% 40%,var(--felt),var(--felt2));border-radius:18px;padding:12px 10px 14px;color:#fff}
+.row-label{font-size:12px;opacity:.75;margin:0 2px 6px;display:flex;justify-content:space-between}
+.slots{display:flex;gap:6px;justify-content:center}
+.slot{width:calc((100% - 24px)/5);max-width:44px;aspect-ratio:5/7;border-radius:8px;border:2px dashed rgba(255,255,255,.35);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:700;font-size:16px;line-height:1.05}
+.slot.filled{background:#fff;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+.slot.target{border-color:#ffd54a;border-style:solid;box-shadow:0 0 0 2px rgba(255,213,74,.35)}
+.slot small{font-size:14px}
+.hero{margin-top:12px}
+
+.result{margin-top:12px;background:var(--sec);border-radius:14px;padding:12px 14px}
+.big{display:flex;align-items:baseline;gap:8px}
+.big b{font-size:38px;letter-spacing:-1px}
+.muted{color:var(--hint);font-size:13px}
+.verdict{margin-top:8px;padding:8px 10px;border-radius:10px;font-weight:600}
+.verdict.good{background:color-mix(in srgb,var(--good) 18%,transparent);color:var(--good)}
+.verdict.bad{background:color-mix(in srgb,var(--bad) 18%,transparent);color:var(--bad)}
+.line{margin-top:6px;font-size:14px}
+.bars{margin-top:8px;display:grid;grid-template-columns:auto 1fr 42px;gap:4px 8px;align-items:center;font-size:13px}
+.bar{height:8px;border-radius:4px;background:var(--accent)}
+.bar-wrap{background:color-mix(in srgb,var(--hint) 20%,transparent);border-radius:4px}
+.loading{opacity:.55;transition:opacity .15s}
+
+.picker{margin-top:12px;display:grid;grid-template-columns:repeat(13,minmax(0,30px));gap:2px;justify-content:center}
+.pc{height:36px;border-radius:5px;background:#9fd8b1;border:1px solid rgba(0,0,0,.18);display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-weight:700;font-size:13px;line-height:1;padding:0}
+.pc span{font-size:11px;margin-top:1px}
+.pc.s,.pc.c{color:var(--s)}.pc.h,.pc.d{color:var(--h)}
+.pc.used{background:#fff;border-color:#fff;box-shadow:0 1px 5px rgba(0,0,0,.45)}
+.pc.used.s,.pc.used.c{color:var(--s)}.pc.used.h,.pc.used.d{color:var(--h)}
+.s{color:var(--s)}.h{color:var(--h)}.d{color:var(--d)}.c{color:var(--c)}
+
+.controls{margin-top:14px;display:grid;gap:10px}
+.ctl{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.stepper{display:flex;align-items:center;background:var(--sec);border-radius:10px}
+.stepper button{width:40px;height:36px;font-size:20px}
+.stepper b{min-width:28px;text-align:center}
+.seg{display:flex;background:var(--sec);border-radius:10px;padding:3px;gap:3px}
+.seg button{flex:1;padding:7px 4px;border-radius:8px;font-size:14px}
+.seg button.on{background:var(--accent);color:var(--accent-text)}
+.pot{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pot label{font-size:12px;color:var(--hint)}
+.pot input{width:100%;margin-top:3px;padding:9px 10px;border-radius:10px;border:0;background:var(--sec);color:var(--text);font:inherit}
+.actions{display:flex;gap:8px;margin-top:4px}
+.actions button{flex:1;padding:11px;border-radius:12px;background:var(--sec);font-weight:600}
+.actions button.primary{background:var(--accent);color:var(--accent-text)}
+.err{color:var(--bad);font-size:13px;margin-top:6px}
+.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.topbar b{font-size:16px}
+.topbar button{padding:6px 12px;border-radius:999px;background:var(--sec);font-size:14px;font-weight:600}
+.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:flex-end;justify-content:center;z-index:10}
+.sheet-bg.open{display:flex}
+.sheet{background:var(--bg);width:100%;max-width:480px;max-height:88vh;overflow-y:auto;border-radius:18px 18px 0 0;padding:14px 14px 22px}
+.sheet-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.sheet-head button{font-size:22px;padding:0 6px;color:var(--hint)}
+.combo{display:grid;grid-template-columns:22px 1fr;gap:2px 8px;padding:8px 6px;border-radius:10px}
+.combo+.combo{border-top:1px solid color-mix(in srgb,var(--hint) 22%,transparent)}
+.combo.mine{background:color-mix(in srgb,var(--accent) 16%,transparent)}
+.combo .n{color:var(--hint);font-weight:700;grid-row:span 3}
+.combo .t{font-weight:700}
+.combo .x{display:flex;gap:3px}
+.mc{display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:30px;padding:0 3px;border-radius:5px;
+  background:#fff;border:1px solid rgba(0,0,0,.14);font-weight:700;font-size:13px}
+.mc.dim{opacity:.35}
+</style>
+</head>
+<body>
+<div class="topbar"><b>Покер-калькулятор</b><button id="combosBtn">📖 Комбинации</button></div>
+<div class="sheet-bg" id="combos"><div class="sheet">
+  <div class="sheet-head"><b>Комбинации — от старшей к младшей</b><button id="combosClose">✕</button></div>
+  <div id="combosList"></div>
+  <div class="muted" style="margin-top:8px">Из 7 карт (2 ваши + 5 на столе) берутся 5 лучших. При равной комбинации побеждает старшая карта (кикер). Туз может быть и младшей картой в стрите: A-2-3-4-5.</div>
+</div></div>
+<div class="table">
+  <div class="row-label"><span>🃏 Стол · <span id="stage">префлоп</span></span><span id="handname"></span></div>
+  <div class="slots" id="board"></div>
+  <div class="hero">
+    <div class="row-label"><span>🖐 Мои карты</span><span id="tgt"></span></div>
+    <div class="slots" id="hand"></div>
+  </div>
+</div>
+
+<div class="result" id="result"></div>
+<div class="picker" id="picker"></div>
+
+<div class="controls">
+  <div class="ctl"><span>👥 За столом</span>
+    <div class="stepper"><button data-step="players:-1">−</button><b id="players"></b><button data-step="players:1">+</button></div></div>
+  <div class="ctl"><span>🎯 В раздаче <span class="muted">(с вами)</span></span>
+    <div class="stepper"><button data-step="active:-1">−</button><b id="active"></b><button data-step="active:1">+</button></div></div>
+  <div><div class="muted" style="margin-bottom:4px">🎭 Соперники играют</div><div class="seg" id="range"></div></div>
+  <div class="pot">
+    <div><label>💰 Банк (со ставкой соперника)</label><input id="pot" inputmode="decimal" placeholder="напр. 300"></div>
+    <div><label>Мне доплатить</label><input id="call" inputmode="decimal" placeholder="напр. 100"></div>
+  </div>
+  <div class="actions">
+    <button id="undo">↩️ Отменить</button>
+    <button id="new" class="primary">🔄 Новая раздача</button>
+  </div>
+</div>
+
+<script>
+const tg = window.Telegram && Telegram.WebApp;
+if (tg) { tg.ready(); tg.expand(); }
+
+const RANKS = "AKQJT98765432", SUITS = "shdc";
+const SYM = {s:"♠", h:"♥", d:"♦", c:"♣"};
+const RLBL = r => r === "T" ? "10" : r;
+const RANGES = {any:"Любые", mid:"Средние ~40%", tight:"Крепкие ~20%"};
+const TYPE_RU = {"High Card":"Старшая карта","Pair":"Пара","Two Pair":"Две пары","Trips":"Сет / тройка",
+  "Straight":"Стрит","Flush":"Флеш","Full House":"Фулл-хаус","Quads":"Каре","Straight Flush":"Стрит-флеш"};
+const TYPES = Object.keys(TYPE_RU);
+const STAGES = {0:"префлоп",1:"…",2:"…",3:"флоп",4:"тёрн",5:"ривер"};
+
+let ranges = ["any"];
+let st = {hand:[], board:[], history:[], target:"hand", players:6, active:6, range:"mid", pot:"", call:""};
+try { Object.assign(st, JSON.parse(localStorage.getItem("poker") || "{}")); } catch (e) {}
+const save = () => { try { localStorage.setItem("poker", JSON.stringify(st)); } catch (e) {} };
+const haptic = () => { try { tg.HapticFeedback.selectionChanged(); } catch (e) {} };
+const $ = id => document.getElementById(id);
+
+function cardHTML(c) { return `<span class="${c[1]}">${RLBL(c[0])}</span><small class="${c[1]}">${SYM[c[1]]}</small>`; }
+
+function toggle(c) {
+  for (const k of ["hand", "board"]) {
+    const i = st[k].indexOf(c);
+    if (i >= 0) { st[k].splice(i, 1); st.history = st.history.filter(x => x !== c); if (st.hand.length < 2) st.target = "hand"; return; }
+  }
+  let t = st.target;
+  if (t === "hand" && st.hand.length >= 2) t = "board";
+  if (t === "board" && st.board.length >= 5) { tg && tg.showAlert ? tg.showAlert("На столе уже 5 карт") : alert("На столе уже 5 карт"); return; }
+  st[t].push(c); st.history.push(c);
+  if (st.target === "hand" && st.hand.length === 2) st.target = "board";
+}
+
+function renderSlots(id, cards, n, kind) {
+  const el = $(id); el.innerHTML = "";
+  for (let i = 0; i < n; i++) {
+    const b = document.createElement("button");
+    const c = cards[i];
+    b.className = "slot" + (c ? " filled" : "") + (!c && st.target === kind && i === cards.length ? " target" : "");
+    b.innerHTML = c ? cardHTML(c) : "";
+    b.onclick = () => { haptic(); if (c) toggle(c); else st.target = kind; update(); };
+    el.appendChild(b);
+  }
+}
+
+function renderPicker() {
+  const el = $("picker"); el.innerHTML = "";
+  for (const s of "scdh") for (const r of RANKS) {
+    const c = r + s, b = document.createElement("button");
+    b.className = "pc " + s + (st.hand.includes(c) ? " used in-hand" : st.board.includes(c) ? " used in-board" : "");
+    b.innerHTML = `${RLBL(r)}<span>${SYM[s]}</span>`;
+    b.onclick = () => { haptic(); toggle(c); update(); };
+    el.appendChild(b);
+  }
+}
+
+function render() {
+  renderSlots("board", st.board, 5, "board");
+  renderSlots("hand", st.hand, 2, "hand");
+  renderPicker();
+  $("stage").textContent = STAGES[st.board.length];
+  $("tgt").textContent = "карта пойдёт: " + ((st.target === "hand" && st.hand.length < 2) ? "в руку" : "на стол");
+  $("players").textContent = st.players;
+  $("active").textContent = st.active;
+  $("range").innerHTML = "";
+  for (const r of ranges) {
+    const b = document.createElement("button");
+    b.textContent = RANGES[r]; b.className = r === st.range ? "on" : "";
+    b.onclick = () => { haptic(); st.range = r; update(); };
+    $("range").appendChild(b);
+  }
+  if (document.activeElement !== $("pot")) $("pot").value = st.pot;
+  if (document.activeElement !== $("call")) $("call").value = st.call;
+}
+
+const pct = x => (x * 100).toFixed(1) + "%";
+const num = v => { const x = parseFloat(String(v).replace(",", ".")); return x > 0 ? x : 0; };
+
+function renderResult(res, err) {
+  const el = $("result"); el.classList.remove("loading");
+  $("handname").textContent = res && res.type ? TYPE_RU[res.type] : "";
+  if (err) { el.innerHTML = `<div class="err">${err}</div>`; return; }
+  if (st.hand.length < 2) { el.innerHTML = `<div class="muted">👇 Выберите свои 2 карты, затем карты стола</div>`; return; }
+  if (!res || res.eq === undefined) { el.innerHTML = `<div class="muted">👇 Добавьте карты флопа (всего 3)</div>`; return; }
+  let h = `<div class="big"><b>${pct(res.eq)}</b><span class="muted">шанс выиграть банк</span></div>
+    <div class="muted">победа ${pct(res.win)} · делёж ${pct(res.tie)} · соперников: ${st.active - 1}</div>`;
+  const pot = num(st.pot), call = num(st.call);
+  if (pot && call) {
+    const need = call / (pot + call), ok = res.eq >= need;
+    h += `<div class="verdict ${ok ? "good" : "bad"}">${ok ? "✅ КОЛЛ выгоден" : "❌ ФОЛД"} — нужно ≥ ${pct(need)}, `
+       + (ok ? `запас +${((res.eq - need) * 100).toFixed(1)}%` : `не хватает ${((need - res.eq) * 100).toFixed(1)}%`) + `</div>`;
+  } else if (res.eq < 1) {
+    h += `<div class="line">💰 Колл выгоден, если доплата ≤ <b>${Math.round(res.eq / (1 - res.eq) * 100)}%</b> банка</div>`;
+  }
+  const o = res.outs;
+  if (o && o.count) {
+    const parts = Object.entries(o.by).sort((a, b) => b[1] - a[1]).map(([t, n]) => `${TYPE_RU[t]} ${n}`).join(" · ");
+    h += `<div class="line">🎯 Ауты: <b>${o.count}</b> (${parts}) — собрать ${st.board.length === 3 ? "к риверу" : "на ривере"}: <b>${pct(o.hit)}</b></div>`;
+  }
+  if (res.dist && st.board.length < 5) {
+    const cur = TYPES.indexOf(res.type);
+    const rows = Object.entries(res.dist).filter(([t, p]) => TYPES.indexOf(t) > cur && p >= 0.01)
+      .sort((a, b) => TYPES.indexOf(b[0]) - TYPES.indexOf(a[0]));
+    if (rows.length) {
+      h += `<div class="line">🔮 К риверу соберёте:</div><div class="bars">` + rows.map(([t, p]) =>
+        `<span>${TYPE_RU[t]}</span><div class="bar-wrap"><div class="bar" style="width:${Math.max(2, p * 100)}%"></div></div><span>${Math.round(p * 100)}%</span>`).join("") + `</div>`;
+    }
+  }
+  h += `<div class="muted" style="margin-top:8px">Математика карт без учёта стиля игры и будущих ставок.</div>`;
+  el.innerHTML = h;
+}
+
+let seq = 0, timer = null, lastRes = null;
+function calc() {
+  clearTimeout(timer);
+  if (st.hand.length < 2 || st.board.length === 1 || st.board.length === 2) {
+    seq++; lastRes = null; renderResult(null); return;
+  }
+  $("result").classList.add("loading");
+  timer = setTimeout(async () => {
+    const my = ++seq;
+    try {
+      const r = await fetch("api/calc", {method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({initData: tg ? tg.initData : "", hand: st.hand, board: st.board, active: st.active, range: st.range})});
+      const data = await r.json();
+      if (my !== seq) return;
+      if (!r.ok) return renderResult(null, data.error || "Ошибка сервера");
+      lastRes = data; renderResult(data);
+    } catch (e) { if (my === seq) renderResult(null, "Нет связи с сервером"); }
+  }, 150);
+}
+
+function update() { save(); render(); calc(); }
+
+// Справка по комбинациям. dim — карты, не входящие в комбинацию (кикеры)
+const COMBOS = [
+  ["Роял-флеш", "A K Q J 10 одной масти", "As Ks Qs Js Ts", "", "Royal"],
+  ["Стрит-флеш", "5 карт подряд одной масти", "9h 8h 7h 6h 5h", "", "Straight Flush"],
+  ["Каре", "4 карты одного достоинства", "Ks Kc Kd Kh 3s", "3s", "Quads"],
+  ["Фулл-хаус", "Тройка + пара", "Qs Qc Qh 7d 7s", "", "Full House"],
+  ["Флеш", "5 карт одной масти, не подряд", "Ad Jd 8d 6d 2d", "", "Flush"],
+  ["Стрит", "5 карт подряд, масти любые", "Ts 9h 8c 7d 6s", "", "Straight"],
+  ["Сет / тройка", "3 карты одного достоинства", "8s 8h 8d Kc 4s", "Kc 4s", "Trips"],
+  ["Две пары", "Две разные пары", "Js Jd 4c 4h As", "As", "Two Pair"],
+  ["Пара", "2 карты одного достоинства", "Ts Th Ks 7c 3d", "Ks 7c 3d", "Pair"],
+  ["Старшая карта", "Ничего не собрано — решает старшая карта", "As Jd 9c 6h 2s", "Jd 9c 6h 2s", "High Card"],
+];
+function renderCombos(type) {
+  $("combosList").innerHTML = COMBOS.map(([name, desc, cards, dim, key], i) => {
+    const dimSet = dim.split(" "), mine = key === type;
+    return `<div class="combo${mine ? " mine" : ""}"><span class="n">${i + 1}</span>
+      <span class="t">${name}${mine ? " — у вас сейчас" : ""}</span><span class="muted">${desc}</span>
+      <span class="x">${cards.split(" ").map(c => `<span class="mc ${c[1]}${dimSet.includes(c) ? " dim" : ""}">${RLBL(c[0])}${SYM[c[1]]}</span>`).join("")}</span></div>`;
+  }).join("");
+}
+$("combosBtn").onclick = () => { haptic(); renderCombos(lastRes && lastRes.type); $("combos").classList.add("open"); };
+$("combosClose").onclick = () => $("combos").classList.remove("open");
+$("combos").onclick = e => { if (e.target.id === "combos") $("combos").classList.remove("open"); };
+
+document.querySelectorAll("[data-step]").forEach(b => b.onclick = () => {
+  haptic();
+  const [k, d] = b.dataset.step.split(":"), n = st[k] + +d;
+  if (k === "players") {
+    if (n < 2 || n > 10) return;
+    if (st.active === st.players || st.active > n) st.active = n;
+    st.players = n;
+  } else {
+    if (n < 2 || n > st.players) return;
+    st.active = n;
+  }
+  update();
+});
+for (const id of ["pot", "call"]) $(id).oninput = e => { st[id] = e.target.value; save(); renderResult(lastRes); };
+$("undo").onclick = () => {
+  haptic();
+  const c = st.history.pop();
+  if (c) { st.hand = st.hand.filter(x => x !== c); st.board = st.board.filter(x => x !== c); }
+  if (st.hand.length < 2) st.target = "hand";
+  update();
+};
+$("new").onclick = () => {
+  haptic();
+  Object.assign(st, {hand: [], board: [], history: [], target: "hand", active: st.players, pot: "", call: ""});
+  update();
+};
+
+fetch("api/config").then(r => r.json()).then(c => {
+  ranges = c.ranges;
+  if (!ranges.includes(st.range)) st.range = ranges.includes("mid") ? "mid" : "any";
+  update();
+}).catch(() => update());
+render();
+</script>
+</body>
+</html>

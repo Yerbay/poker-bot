@@ -1,0 +1,3 @@
+python-telegram-bot>=21.0
+eval7>=0.1.10
+aiohttp>=3.9

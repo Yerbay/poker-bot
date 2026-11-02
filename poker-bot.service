@@ -1,0 +1,15 @@
+[Unit]
+Description=Poker equity Telegram bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/poker
+EnvironmentFile=/home/ubuntu/poker/.env
+ExecStart=/home/ubuntu/poker/venv/bin/python poker_bot.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
